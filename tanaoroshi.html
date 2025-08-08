@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>棚卸しLite</title>
+<style>
+  :root{
+    --bg: #0f1115; --fg:#e9eef7; --muted:#9aa4b2; --card:#151924; --acc:#4aa3ff; --warn:#ff6b6b; --ok:#22c55e;
+    --border:#273043;
+  }
+  .light{ --bg:#f7f7fb; --fg:#111826; --muted:#475569; --card:#ffffff; --acc:#0b6bcb; --warn:#c2410c; --ok:#15803d; --border:#e5e7eb;}
+  html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif;}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:5}
+  header h1{font-size:16px;margin:0}
+  .btn{border:1px solid var(--border);background:transparent;color:var(--fg);padding:6px 10px;border-radius:8px;cursor:pointer}
+  .btn.acc{background:var(--acc);color:#fff;border-color:transparent}
+  .btn.warn{background:var(--warn);color:#fff;border-color:transparent}
+  .btn.ok{background:var(--ok);color:#fff;border-color:transparent}
+  .wrap{display:grid;grid-template-columns:320px 1fr 380px;gap:10px;height:calc(100% - 56px);padding:10px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:0;display:flex;flex-direction:column}
+  .card h2{font-size:13px;margin:0 0 8px 0;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  input,select{background:transparent;color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;outline:none}
+  input::placeholder{color:var(--muted)}
+  .toolrow{display:flex;gap:8px;flex-wrap:wrap}
+  .list{overflow:auto;border-radius:8px;border:1px solid var(--border)}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px;border-bottom:1px solid var(--border);text-align:left;font-size:13px}
+  tr:hover{background:rgba(128,128,128,.08)}
+  .sku{font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+  .pill{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+  .row{display:flex;gap:8px;align-items:center;margin:6px 0}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+  .pad .btn{padding:14px 0;font-size:16px}
+  .grow{flex:1}
+  .right h3{margin:8px 0 4px 0;font-size:14px}
+  .stat{display:flex;gap:8px;align-items:center}
+  .stat .v{font-weight:700}
+  .muted{color:var(--muted)}
+  .badge{font-size:11px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid var(--border)}
+  .diff-pos{color:var(--ok)} .diff-neg{color:var(--warn)}
+  .footer{display:flex;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
+  .kbd{border:1px solid var(--border);border-bottom-width:2px;padding:0 6px;border-radius:6px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>棚卸しLite</h1>
+  <div class="toolrow">
+    <button class="btn" id="themeBtn">🌗 テーマ</button>
+    <label class="btn"><input type="file" id="csvInput" accept=".csv" hidden>📥 マスター読込(CSV)</label>
+    <button class="btn" id="saveJson">💾 保存(JSON)</button>
+    <label class="btn"><input type="file" id="jsonInput" accept=".json" hidden>📂 読込(JSON)</label>
+    <button class="btn acc" id="exportDiff">📤 差異エクスポート(CSV)</button>
+    <button class="btn warn" id="resetAll">♻ 初期化</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- 左：操作 -->
+  <section class="card">
+    <h2>操作</h2>
+    <div class="row">
+      <input class="grow" id="q" placeholder="検索：SKU/名称/ロケーション (⌘/Ctrl+K)" />
+    </div>
+    <div class="row">
+      <select id="locFilter" class="grow"><option value="">ロケーション：すべて</option></select>
+    </div>
+    <div class="row">
+      <input id="user" placeholder="担当者 (記録用)" />
+      <span class="pill" id="countedStat">0 / 0</span>
+    </div>
+    <div class="row">
+      <button class="btn" id="cameraBtn">📷 バーコード</button>
+      <span class="muted">※対応ブラウザのみ</span>
+    </div>
+    <video id="video" playsinline style="width:100%;display:none;border-radius:8px;border:1px solid var(--border);"></video>
+    <div class="footer muted">
+      <div class="kbd">Enter</div> 選択に加算　
+      <div class="kbd">←/→</div> ±1　
+      <div class="kbd">Del</div> 0クリア
+    </div>
+  </section>
+
+  <!-- 中：一覧 -->
+  <section class="card">
+    <h2>品目一覧</h2>
+    <div class="list" style="flex:1">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th>SKU</th><th>名称</th><th>Loc</th><th>期待</th><th>実棚</th><th>差異</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 右：カウントパッド -->
+  <section class="card right">
+    <h2>カウント</h2>
+    <div id="selInfo" class="muted">行を選択してください</div>
+    <div class="row">
+      <input id="qtyInput" type="number" placeholder="数量を入力" class="grow" />
+      <button class="btn ok" id="setBtn">設定</button>
+    </div>
+    <div class="pad">
+      <button class="btn" data-add="1">+1</button>
+      <button class="btn" data-add="5">+5</button>
+      <button class="btn" data-add="10">+10</button>
+      <button class="btn" data-add="-1">-1</button>
+      <button class="btn" data-add="-5">-5</button>
+      <button class="btn" data-add="-10">-10</button>
+    </div>
+    <div style="margin-top:10px">
+      <button class="btn" id="clearBtn">実棚を0に</button>
+    </div>
+    <h3>統計</h3>
+    <div class="stat"><span class="badge">総期待</span><span class="v" id="sumExp">0</span></div>
+    <div class="stat"><span class="badge">総実棚</span><span class="v" id="sumCnt">0</span></div>
+    <div class="stat"><span class="badge">総差異</span><span class="v" id="sumDiff">0</span></div>
+  </section>
+</div>
+
+<script>
+/* ====== データ管理 ====== */
+let items = JSON.parse(localStorage.getItem('inv_items') || 'null') || [
+  {sku:"TXM050-P003-18-3", name:"RF Amp Cable", loc:"A1", expected:12, counted:0},
+  {sku:"AXG-5000III-27M-SMS", name:"Generator", loc:"A2", expected:5, counted:0},
+  {sku:"AMVG-3000-27M-UE", name:"Match Unit", loc:"B1", expected:8, counted:0},
+  {sku:"AMVS-3000-MF-BE", name:"Power Supply", loc:"B2", expected:3, counted:0},
+];
+let selected = null;
+
+const els = {
+  q: $("#q"), locFilter: $("#locFilter"), tbl: $("#tbl tbody"),
+  countedStat: $("#countedStat"),
+  qtyInput: $("#qtyInput"), setBtn: $("#setBtn"), clearBtn: $("#clearBtn"),
+  sumExp: $("#sumExp"), sumCnt: $("#sumCnt"), sumDiff: $("#sumDiff"),
+  user: $("#user"), selInfo: $("#selInfo"),
+  csvInput: $("#csvInput"), exportDiff: $("#exportDiff"),
+  saveJson: $("#saveJson"), jsonInput: $("#jsonInput"),
+  resetAll: $("#resetAll"), themeBtn: $("#themeBtn"),
+  cameraBtn: $("#cameraBtn"), video: $("#video")
+};
+
+init();
+
+/* ====== 初期化 ====== */
+function init(){
+  applyTheme(localStorage.getItem('inv_theme') || 'dark');
+  els.user.value = localStorage.getItem('inv_user') || "";
+  els.user.addEventListener('input', ()=>localStorage.setItem('inv_user', els.user.value));
+  renderLocs(); renderTable(); updateStats();
+  // 検索・フィルタ
+  els.q.addEventListener('input', renderTable);
+  els.locFilter.addEventListener('change', renderTable);
+  // 数量操作
+  document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click', ()=>{
+    if(!selected) return;
+    addQty(parseInt(b.dataset.add||"0",10));
+  }));
+  els.setBtn.addEventListener('click', ()=>{ if(selected){ setQty(parseInt(els.qtyInput.value||"0",10)); }});
+  els.clearBtn.addEventListener('click', ()=>{ if(selected){ setQty(0); }});
+  // キーボード
+  document.addEventListener('keydown', onKey);
+  // ファイルIO
+  els.csvInput.addEventListener('change', importCSV);
+  els.exportDiff.addEventListener('click', exportDiffCSV);
+  els.saveJson.addEventListener('click', saveJSON);
+  els.jsonInput.addEventListener('change', loadJSON);
+  els.resetAll.addEventListener('click', resetAll);
+  // テーマ
+  els.themeBtn.addEventListener('click', toggleTheme);
+  // カメラ
+  els.cameraBtn.addEventListener('click', toggleCamera);
+}
+
+/* ====== UI描画 ====== */
+function renderLocs(){
+  const locs = [...new Set(items.map(i=>i.loc))].sort();
+  els.locFilter.innerHTML = `<option value="">ロケーション：すべて</option>` + locs.map(l=>`<option value=""></option>`).join('');
+}
+function renderTable(){
+  const q = els.q.value.trim().toLowerCase();
+  const lf = els.locFilter.value;
+  const rows = items
+    .filter(it => (!lf || it.loc===lf))
+    .filter(it => {
+      if(!q) return true;
+      return [it.sku,it.name,it.loc].some(v=>String(v).toLowerCase().includes(q));
+    })
+    .map((it,idx)=>{
+      const diff = (it.counted||0) - (it.expected||0);
+      const diffCls = diff===0?'':(diff>0?'diff-pos':'diff-neg');
+      return `<tr data-idx="" class="''">
+        <td class="sku"></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class=""></td>
+      </tr>`;
+    }).join('');
+  els.tbl.innerHTML = rows || `<tr><td colspan="6" class="muted">対象なし</td></tr>`;
+  // 行クリック
+  [...els.tbl.querySelectorAll("tr")].forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      const it = items[parseInt(tr.dataset.idx,10)];
+      selectItem(it);
+    });
+  });
+  updateStats();
+}
+
+function selectItem(it){
+  selected = it;
+  els.selInfo.innerHTML = `選択中：<span class="sku badge"></span>　　<span class="badge"></span><br>
+  期待：　実棚：　差異：<b>${(it.counted||0)-(it.expected||0)}</b>`;
+  els.qtyInput.value = it.counted||0;
+  renderTable(); // 選択表示更新
+}
+
+function updateStats(){
+  const sumExp = items.reduce((a,b)=>a+(b.expected||0),0);
+  const sumCnt = items.reduce((a,b)=>a+(b.counted||0),0);
+  const countedLines = items.filter(i=>(i.counted||0)!==0).length;
+  els.sumExp.textContent = sumExp;
+  els.sumCnt.textContent = sumCnt;
+  els.sumDiff.textContent = sumCnt - sumExp;
+  els.countedStat.textContent = ` / `;
+  persist();
+}
+
+/* ====== 操作 ====== */
+function addQty(d){
+  const v = (selected.counted||0) + d;
+  setQty(Math.max(0,v));
+}
+function setQty(v){
+  if(Number.isNaN(v)) return;
+  selected.counted = Math.max(0, v|0);
+  updateStats(); selectItem(selected);
+}
+
+/* ====== 入出力 ====== */
+async function importCSV(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const txt = await f.text();
+  // 想定ヘッダ: sku,name,loc,expected
+  const lines = txt.split(/\r?\n/).filter(l=>l.trim().length);
+  const [h,...rows] = lines;
+  const cols = h.split(',').map(s=>s.trim().toLowerCase());
+  const map = {sku:cols.indexOf('sku'), name:cols.indexOf('name'), loc:cols.indexOf('loc'), expected:cols.indexOf('expected')};
+  if(Object.values(map).some(v=>v===-1)){ alert("CSVヘッダは sku,name,loc,expected が必要です"); return; }
+  items = rows.map(r=>{
+    const c = r.split(',');
+    return { sku:c[map.sku], name:c[map.name], loc:c[map.loc], expected:parseInt(c[map.expected]||"0",10)||0, counted:0 };
+  });
+  selected=null; renderLocs(); renderTable();
+}
+
+function exportDiffCSV(){
+  const u = els.user.value || "";
+  const rows = [
+    ["timestamp","user","sku","name","loc","expected","counted","diff"].join(","),
+    ...items.map(i=>[
+      new Date().toISOString(), csv(u), csv(i.sku), csv(i.name), csv(i.loc),
+      i.expected, i.counted||0, (i.counted||0)-(i.expected||0)
+    ].join(","))
+  ].join("\n");
+  downloadText(`diff_.csv`, rows);
+}
+
+function saveJSON(){
+  downloadText(`inventory_.json`, JSON.stringify({items, user:els.user.value, theme:document.body.classList.contains('light')?'light':'dark'}, null, 2));
+}
+async function loadJSON(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const obj = JSON.parse(await f.text());
+  if(obj.items){ items = obj.items; }
+  if(obj.user){ els.user.value = obj.user; }
+  applyTheme(obj.theme||'dark');
+  selected=null; renderLocs(); renderTable();
+}
+
+function resetAll(){
+  if(!confirm("実棚数をすべて0に戻します。よろしいですか？")) return;
+  items.forEach(i=>i.counted=0);
+  selected=null; renderTable();
+}
+
+/* ====== カメラ／バーコード ====== */
+let stream=null, scanning=false;
+async function toggleCamera(){
+  const video = els.video;
+  if(scanning){ stopCamera(); return; }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    video.srcObject = stream; video.style.display="block"; await video.play(); scanning=true;
+    scanLoop();
+  }catch(e){ alert("カメラにアクセスできませんでした"); }
+}
+function stopCamera(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+  els.video.pause(); els.video.srcObject=null; els.video.style.display="none"; scanning=false;
+}
+async function scanLoop(){
+  if(!("BarcodeDetector" in window)){
+    // Fallback: カメラ映像は見せるだけ。手入力で使用。
+    console.info("BarcodeDetector未対応");
+    return;
+  }
+  const detector = new BarcodeDetector({formats:["ean_13","code_128","code_39","qr_code","upc_e","upc_a"]});
+  while(scanning){
+    try{
+      const codes = await detector.detect(els.video);
+      if(codes.length){
+        const code = codes[0].rawValue.trim();
+        const hit = items.find(i=>i.sku===code);
+        if(hit){
+          selectItem(hit);
+          addQty(1);
+        }
+      }
+    }catch(e){ /* ignore */ }
+    await wait(250);
+  }
+}
+
+/* ====== ユーティリティ ====== */
+function $(q){ return document.querySelector(q); }
+function esc(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+function csv(s){ return `""`; }
+function downloadText(name, text){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type:"text/plain"}));
+  a.download = name; a.click();
+}
+function persist(){ localStorage.setItem('inv_items', JSON.stringify(items)); }
+function yyyymmdd(){ const d = new Date(); const p=n=>String(n).padStart(2,'0'); return `_`; }
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ====== テーマ ====== */
+function applyTheme(mode){ document.body.classList.toggle('light', mode==='light'); localStorage.setItem('inv_theme', mode); }
+function toggleTheme(){ applyTheme(document.body.classList.contains('light')?'dark':'light'); }
+</script>
+</body>
+</html>
