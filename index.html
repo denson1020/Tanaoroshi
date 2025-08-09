@@ -1,351 +1,324 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>棚卸しLite</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Mini Mobile FPS</title>
 <style>
-  :root{
-    --bg: #0f1115; --fg:#e9eef7; --muted:#9aa4b2; --card:#151924; --acc:#4aa3ff; --warn:#ff6b6b; --ok:#22c55e;
-    --border:#273043;
+  html,body { margin:0; height:100%; background:#000; overflow:hidden; touch-action:none; font-family: system-ui, -apple-system, sans-serif; }
+  #ui { position:fixed; inset:0; pointer-events:none; }
+  #score, #time {
+    position: absolute; top: env(safe-area-inset-top, 8px); 
+    background:rgba(0,0,0,.45); color:#fff; padding:6px 10px; border-radius:8px; font-weight:700; font-size:14px;
   }
-  .light{ --bg:#f7f7fb; --fg:#111826; --muted:#475569; --card:#ffffff; --acc:#0b6bcb; --warn:#c2410c; --ok:#15803d; --border:#e5e7eb;}
-  html,body{height:100%;}
-  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, sans-serif;}
-  header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:5}
-  header h1{font-size:16px;margin:0}
-  .btn{border:1px solid var(--border);background:transparent;color:var(--fg);padding:6px 10px;border-radius:8px;cursor:pointer}
-  .btn.acc{background:var(--acc);color:#fff;border-color:transparent}
-  .btn.warn{background:var(--warn);color:#fff;border-color:transparent}
-  .btn.ok{background:var(--ok);color:#fff;border-color:transparent}
-  .wrap{display:grid;grid-template-columns:320px 1fr 380px;gap:10px;height:calc(100% - 56px);padding:10px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:0;display:flex;flex-direction:column}
-  .card h2{font-size:13px;margin:0 0 8px 0;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-  input,select{background:transparent;color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;outline:none}
-  input::placeholder{color:var(--muted)}
-  .toolrow{display:flex;gap:8px;flex-wrap:wrap}
-  .list{overflow:auto;border-radius:8px;border:1px solid var(--border)}
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:8px;border-bottom:1px solid var(--border);text-align:left;font-size:13px}
-  tr:hover{background:rgba(128,128,128,.08)}
-  .sku{font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
-  .pill{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
-  .row{display:flex;gap:8px;align-items:center;margin:6px 0}
-  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-  .pad .btn{padding:14px 0;font-size:16px}
-  .grow{flex:1}
-  .right h3{margin:8px 0 4px 0;font-size:14px}
-  .stat{display:flex;gap:8px;align-items:center}
-  .stat .v{font-weight:700}
-  .muted{color:var(--muted)}
-  .badge{font-size:11px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid var(--border)}
-  .diff-pos{color:var(--ok)} .diff-neg{color:var(--warn)}
-  .footer{display:flex;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
-  .kbd{border:1px solid var(--border);border-bottom-width:2px;padding:0 6px;border-radius:6px;font-size:12px}
+  #score { left: env(safe-area-inset-left, 8px); }
+  #time { right: env(safe-area-inset-right, 8px); }
+  /* 左：移動スティック */
+  .stickArea { position:absolute; bottom: env(safe-area-inset-bottom, 14px); width:38vw; height:38vw; max-width:260px; max-height:260px; pointer-events:auto; }
+  #leftArea { left: env(safe-area-inset-left, 14px); }
+  #rightArea { right: env(safe-area-inset-right, 14px); }
+  .ring, .dot {
+    position:absolute; border-radius:50%; transform:translate(-50%,-50%);
+    left:50%; top:50%;
+  }
+  .ring { width:70%; height:70%; border:3px solid rgba(255,255,255,.35); }
+  .dot  { width:28%; height:28%; background:rgba(255,255,255,.35); }
+  /* 右：射撃ボタン */
+  #shootBtn {
+    position:absolute; right: env(safe-area-inset-right, 18px); bottom: calc(env(safe-area-inset-bottom, 18px) + 4px);
+    width:64px; height:64px; border-radius:50%; background:rgba(255,50,50,.85); color:#fff; 
+    display:flex; align-items:center; justify-content:center; font-weight:900; pointer-events:auto; user-select:none;
+    box-shadow: 0 6px 18px rgba(255,50,50,.5);
+  }
+  #hint { position:absolute; left:50%; transform:translateX(-50%); bottom: env(safe-area-inset-bottom, 8px); color:#aaa; font-size:12px; }
+  /* 小型端末での縮小 */
+  @media (max-width: 420px) {
+    .stickArea { width:45vw; height:45vw; }
+    #shootBtn { width:58px; height:58px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>棚卸しLite</h1>
-  <div class="toolrow">
-    <button class="btn" id="themeBtn">🌗 テーマ</button>
-    <label class="btn"><input type="file" id="csvInput" accept=".csv" hidden>📥 マスター読込(CSV)</label>
-    <button class="btn" id="saveJson">💾 保存(JSON)</button>
-    <label class="btn"><input type="file" id="jsonInput" accept=".json" hidden>📂 読込(JSON)</label>
-    <button class="btn acc" id="exportDiff">📤 差異エクスポート(CSV)</button>
-    <button class="btn warn" id="resetAll">♻ 初期化</button>
+<canvas id="game"></canvas>
+<div id="ui">
+  <div id="score">Score: 0</div>
+  <div id="time">60.0s</div>
+
+  <div id="leftArea" class="stickArea">
+    <div class="ring"></div><div class="dot" id="leftDot"></div>
   </div>
-</header>
-
-<div class="wrap">
-  <!-- 左：操作 -->
-  <section class="card">
-    <h2>操作</h2>
-    <div class="row">
-      <input class="grow" id="q" placeholder="検索：SKU/名称/ロケーション (⌘/Ctrl+K)" />
-    </div>
-    <div class="row">
-      <select id="locFilter" class="grow"><option value="">ロケーション：すべて</option></select>
-    </div>
-    <div class="row">
-      <input id="user" placeholder="担当者 (記録用)" />
-      <span class="pill" id="countedStat">0 / 0</span>
-    </div>
-    <div class="row">
-      <button class="btn" id="cameraBtn">📷 バーコード</button>
-      <span class="muted">※対応ブラウザのみ</span>
-    </div>
-    <video id="video" playsinline style="width:100%;display:none;border-radius:8px;border:1px solid var(--border);"></video>
-    <div class="footer muted">
-      <div class="kbd">Enter</div> 選択に加算　
-      <div class="kbd">←/→</div> ±1　
-      <div class="kbd">Del</div> 0クリア
-    </div>
-  </section>
-
-  <!-- 中：一覧 -->
-  <section class="card">
-    <h2>品目一覧</h2>
-    <div class="list" style="flex:1">
-      <table id="tbl">
-        <thead>
-          <tr>
-            <th>SKU</th><th>名称</th><th>Loc</th><th>期待</th><th>実棚</th><th>差異</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- 右：カウントパッド -->
-  <section class="card right">
-    <h2>カウント</h2>
-    <div id="selInfo" class="muted">行を選択してください</div>
-    <div class="row">
-      <input id="qtyInput" type="number" placeholder="数量を入力" class="grow" />
-      <button class="btn ok" id="setBtn">設定</button>
-    </div>
-    <div class="pad">
-      <button class="btn" data-add="1">+1</button>
-      <button class="btn" data-add="5">+5</button>
-      <button class="btn" data-add="10">+10</button>
-      <button class="btn" data-add="-1">-1</button>
-      <button class="btn" data-add="-5">-5</button>
-      <button class="btn" data-add="-10">-10</button>
-    </div>
-    <div style="margin-top:10px">
-      <button class="btn" id="clearBtn">実棚を0に</button>
-    </div>
-    <h3>統計</h3>
-    <div class="stat"><span class="badge">総期待</span><span class="v" id="sumExp">0</span></div>
-    <div class="stat"><span class="badge">総実棚</span><span class="v" id="sumCnt">0</span></div>
-    <div class="stat"><span class="badge">総差異</span><span class="v" id="sumDiff">0</span></div>
-  </section>
+  <div id="rightArea" class="stickArea">
+    <div class="ring"></div><div class="dot" id="rightDot"></div>
+  </div>
+  <div id="shootBtn">SHOOT</div>
+  <div id="hint">左＝移動 / 右ドラッグ＝視点 / ボタン＝射撃</div>
 </div>
 
+<!-- three.js（CDN） -->
+<script src="https://unpkg.com/three@0.160.1/build/three.min.js"></script>
+
 <script>
-/* ====== データ管理 ====== */
-let items = JSON.parse(localStorage.getItem('inv_items') || 'null') || [
-  {sku:"TXM050-P003-18-3", name:"RF Amp Cable", loc:"A1", expected:12, counted:0},
-  {sku:"AXG-5000III-27M-SMS", name:"Generator", loc:"A2", expected:5, counted:0},
-  {sku:"AMVG-3000-27M-UE", name:"Match Unit", loc:"B1", expected:8, counted:0},
-  {sku:"AMVS-3000-MF-BE", name:"Power Supply", loc:"B2", expected:3, counted:0},
-];
-let selected = null;
+(() => {
+  // ====== 基本セットアップ ======
+  const canvas = document.getElementById('game');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0a12);
 
-const els = {
-  q: $("#q"), locFilter: $("#locFilter"), tbl: $("#tbl tbody"),
-  countedStat: $("#countedStat"),
-  qtyInput: $("#qtyInput"), setBtn: $("#setBtn"), clearBtn: $("#clearBtn"),
-  sumExp: $("#sumExp"), sumCnt: $("#sumCnt"), sumDiff: $("#sumDiff"),
-  user: $("#user"), selInfo: $("#selInfo"),
-  csvInput: $("#csvInput"), exportDiff: $("#exportDiff"),
-  saveJson: $("#saveJson"), jsonInput: $("#jsonInput"),
-  resetAll: $("#resetAll"), themeBtn: $("#themeBtn"),
-  cameraBtn: $("#cameraBtn"), video: $("#video")
-};
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 200);
+  camera.position.set(0, 1.6, 6); // 身長1.6mくらい
 
-init();
+  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  dir.position.set(3,5,2);
+  scene.add(ambient, dir);
 
-/* ====== 初期化 ====== */
-function init(){
-  applyTheme(localStorage.getItem('inv_theme') || 'dark');
-  els.user.value = localStorage.getItem('inv_user') || "";
-  els.user.addEventListener('input', ()=>localStorage.setItem('inv_user', els.user.value));
-  renderLocs(); renderTable(); updateStats();
-  // 検索・フィルタ
-  els.q.addEventListener('input', renderTable);
-  els.locFilter.addEventListener('change', renderTable);
-  // 数量操作
-  document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click', ()=>{
-    if(!selected) return;
-    addQty(parseInt(b.dataset.add||"0",10));
-  }));
-  els.setBtn.addEventListener('click', ()=>{ if(selected){ setQty(parseInt(els.qtyInput.value||"0",10)); }});
-  els.clearBtn.addEventListener('click', ()=>{ if(selected){ setQty(0); }});
-  // キーボード
-  document.addEventListener('keydown', onKey);
-  // ファイルIO
-  els.csvInput.addEventListener('change', importCSV);
-  els.exportDiff.addEventListener('click', exportDiffCSV);
-  els.saveJson.addEventListener('click', saveJSON);
-  els.jsonInput.addEventListener('change', loadJSON);
-  els.resetAll.addEventListener('click', resetAll);
-  // テーマ
-  els.themeBtn.addEventListener('click', toggleTheme);
-  // カメラ
-  els.cameraBtn.addEventListener('click', toggleCamera);
-}
+  // 地面 & 壁
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(80,80),
+    new THREE.MeshPhongMaterial({color:0x22232a})
+  );
+  floor.rotation.x = -Math.PI/2;
+  scene.add(floor);
 
-/* ====== UI描画 ====== */
-function renderLocs(){
-  const locs = [...new Set(items.map(i=>i.loc))].sort();
-  els.locFilter.innerHTML = `<option value="">ロケーション：すべて</option>` + locs.map(l=>`<option value=""></option>`).join('');
-}
-function renderTable(){
-  const q = els.q.value.trim().toLowerCase();
-  const lf = els.locFilter.value;
-  const rows = items
-    .filter(it => (!lf || it.loc===lf))
-    .filter(it => {
-      if(!q) return true;
-      return [it.sku,it.name,it.loc].some(v=>String(v).toLowerCase().includes(q));
-    })
-    .map((it,idx)=>{
-      const diff = (it.counted||0) - (it.expected||0);
-      const diffCls = diff===0?'':(diff>0?'diff-pos':'diff-neg');
-      return `<tr data-idx="" class="''">
-        <td class="sku"></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td class=""></td>
-      </tr>`;
-    }).join('');
-  els.tbl.innerHTML = rows || `<tr><td colspan="6" class="muted">対象なし</td></tr>`;
-  // 行クリック
-  [...els.tbl.querySelectorAll("tr")].forEach(tr=>{
-    tr.addEventListener('click', ()=>{
-      const it = items[parseInt(tr.dataset.idx,10)];
-      selectItem(it);
-    });
-  });
-  updateStats();
-}
+  // 簡易アリーナ壁
+  const wallMat = new THREE.MeshPhongMaterial({color:0x1a1c24, shininess:5});
+  const mkWall = (w,h,d,x,z,rotY=0) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
+    m.position.set(x, h/2, z);
+    m.rotation.y = rotY;
+    m.receiveShadow = m.castShadow = true;
+    scene.add(m);
+  };
+  const size = 18;
+  mkWall(size, 3, 0.5, 0, -size/2);
+  mkWall(size, 3, 0.5, 0,  size/2);
+  mkWall(0.5, 3, size, -size/2, 0);
+  mkWall(0.5, 3, size,  size/2, 0);
 
-function selectItem(it){
-  selected = it;
-  els.selInfo.innerHTML = `選択中：<span class="sku badge"></span>　　<span class="badge"></span><br>
-  期待：　実棚：　差異：<b>${(it.counted||0)-(it.expected||0)}</b>`;
-  els.qtyInput.value = it.counted||0;
-  renderTable(); // 選択表示更新
-}
-
-function updateStats(){
-  const sumExp = items.reduce((a,b)=>a+(b.expected||0),0);
-  const sumCnt = items.reduce((a,b)=>a+(b.counted||0),0);
-  const countedLines = items.filter(i=>(i.counted||0)!==0).length;
-  els.sumExp.textContent = sumExp;
-  els.sumCnt.textContent = sumCnt;
-  els.sumDiff.textContent = sumCnt - sumExp;
-  els.countedStat.textContent = ` / `;
-  persist();
-}
-
-/* ====== 操作 ====== */
-function addQty(d){
-  const v = (selected.counted||0) + d;
-  setQty(Math.max(0,v));
-}
-function setQty(v){
-  if(Number.isNaN(v)) return;
-  selected.counted = Math.max(0, v|0);
-  updateStats(); selectItem(selected);
-}
-
-/* ====== 入出力 ====== */
-async function importCSV(ev){
-  const f = ev.target.files[0]; if(!f) return;
-  const txt = await f.text();
-  // 想定ヘッダ: sku,name,loc,expected
-  const lines = txt.split(/\r?\n/).filter(l=>l.trim().length);
-  const [h,...rows] = lines;
-  const cols = h.split(',').map(s=>s.trim().toLowerCase());
-  const map = {sku:cols.indexOf('sku'), name:cols.indexOf('name'), loc:cols.indexOf('loc'), expected:cols.indexOf('expected')};
-  if(Object.values(map).some(v=>v===-1)){ alert("CSVヘッダは sku,name,loc,expected が必要です"); return; }
-  items = rows.map(r=>{
-    const c = r.split(',');
-    return { sku:c[map.sku], name:c[map.name], loc:c[map.loc], expected:parseInt(c[map.expected]||"0",10)||0, counted:0 };
-  });
-  selected=null; renderLocs(); renderTable();
-}
-
-function exportDiffCSV(){
-  const u = els.user.value || "";
-  const rows = [
-    ["timestamp","user","sku","name","loc","expected","counted","diff"].join(","),
-    ...items.map(i=>[
-      new Date().toISOString(), csv(u), csv(i.sku), csv(i.name), csv(i.loc),
-      i.expected, i.counted||0, (i.counted||0)-(i.expected||0)
-    ].join(","))
-  ].join("\n");
-  downloadText(`diff_.csv`, rows);
-}
-
-function saveJSON(){
-  downloadText(`inventory_.json`, JSON.stringify({items, user:els.user.value, theme:document.body.classList.contains('light')?'light':'dark'}, null, 2));
-}
-async function loadJSON(ev){
-  const f = ev.target.files[0]; if(!f) return;
-  const obj = JSON.parse(await f.text());
-  if(obj.items){ items = obj.items; }
-  if(obj.user){ els.user.value = obj.user; }
-  applyTheme(obj.theme||'dark');
-  selected=null; renderLocs(); renderTable();
-}
-
-function resetAll(){
-  if(!confirm("実棚数をすべて0に戻します。よろしいですか？")) return;
-  items.forEach(i=>i.counted=0);
-  selected=null; renderTable();
-}
-
-/* ====== カメラ／バーコード ====== */
-let stream=null, scanning=false;
-async function toggleCamera(){
-  const video = els.video;
-  if(scanning){ stopCamera(); return; }
-  try{
-    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
-    video.srcObject = stream; video.style.display="block"; await video.play(); scanning=true;
-    scanLoop();
-  }catch(e){ alert("カメラにアクセスできませんでした"); }
-}
-function stopCamera(){
-  if(stream){ stream.getTracks().forEach(t=>t.stop()); }
-  els.video.pause(); els.video.srcObject=null; els.video.style.display="none"; scanning=false;
-}
-async function scanLoop(){
-  if(!("BarcodeDetector" in window)){
-    // Fallback: カメラ映像は見せるだけ。手入力で使用。
-    console.info("BarcodeDetector未対応");
-    return;
+  // ========== 敵 ==========
+  const enemies = [];
+  const enemyMat = new THREE.MeshPhongMaterial({color:0x3ec7ff});
+  function spawnEnemy(){
+    const s = 0.7 + Math.random()*0.6;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(s,s,s), enemyMat.clone());
+    // アリーナ内ランダム
+    box.position.set((Math.random()-0.5)*(size-3), 1+s/2, (Math.random()-0.5)*(size-3));
+    box.userData.vx = (Math.random()*1.2-0.6);
+    box.userData.vz = (Math.random()*1.2-0.6);
+    box.userData.hp = 1;
+    scene.add(box);
+    enemies.push(box);
   }
-  const detector = new BarcodeDetector({formats:["ean_13","code_128","code_39","qr_code","upc_e","upc_a"]});
-  while(scanning){
-    try{
-      const codes = await detector.detect(els.video);
-      if(codes.length){
-        const code = codes[0].rawValue.trim();
-        const hit = items.find(i=>i.sku===code);
-        if(hit){
-          selectItem(hit);
-          addQty(1);
+  for(let i=0;i<8;i++) spawnEnemy();
+
+  // ========== 入力(仮想スティック/視点ドラッグ) ==========
+  const leftArea = document.getElementById('leftArea');
+  const rightArea = document.getElementById('rightArea');
+  const leftDot = document.getElementById('leftDot');
+  const rightDot = document.getElementById('rightDot');
+  const shootBtn = document.getElementById('shootBtn');
+
+  const stick = (area, dot) => {
+    const st = {id:null, x:0, y:0, active:false};
+    const rect = () => area.getBoundingClientRect();
+    const clamp = (v, m) => Math.max(-m, Math.min(m, v));
+    const onStart = (e) => {
+      for(const t of e.changedTouches){
+        if(!st.active){
+          const r = rect();
+          if(t.clientX>=r.left && t.clientX<=r.right && t.clientY>=r.top && t.clientY<=r.bottom){
+            st.id = t.identifier; st.active = true;
+            dot.style.transition = '0s';
+            onMove(e);
+          }
         }
       }
-    }catch(e){ /* ignore */ }
-    await wait(250);
+    };
+    const onMove = (e) => {
+      if(!st.active) return;
+      for(const t of e.changedTouches){
+        if(t.identifier===st.id){
+          const r = rect();
+          const cx = r.left + r.width/2;
+          const cy = r.top + r.height/2;
+          const dx = clamp((t.clientX - cx) / (r.width*0.35), 1);
+          const dy = clamp((t.clientY - cy) / (r.height*0.35), 1);
+          st.x = dx; st.y = dy;
+          dot.style.left = (50 + dx*35) + '%';
+          dot.style.top  = (50 + dy*35) + '%';
+        }
+      }
+    };
+    const onEnd = (e) => {
+      for(const t of e.changedTouches){
+        if(t.identifier===st.id){
+          st.id=null; st.active=false; st.x=0; st.y=0;
+          dot.style.transition = '.12s';
+          dot.style.left='50%'; dot.style.top='50%';
+        }
+      }
+    };
+    area.addEventListener('touchstart', onStart, {passive:false});
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onEnd, {passive:false});
+    window.addEventListener('touchcancel', onEnd, {passive:false});
+    return st;
+  };
+
+  const moveStick = stick(leftArea, leftDot);
+
+  // 視点ドラッグ
+  const look = { active:false, id:null, dx:0, dy:0 };
+  rightArea.addEventListener('touchstart', (e)=>{
+    for(const t of e.changedTouches){
+      if(!look.active){
+        const r = rightArea.getBoundingClientRect();
+        if(t.clientX>=r.left && t.clientX<=r.right && t.clientY>=r.top && t.clientY<=r.bottom){
+          look.active=true; look.id=t.identifier; look.dx=0; look.dy=0;
+        }
+      }
+    }
+  }, {passive:false});
+  window.addEventListener('touchmove', (e)=>{
+    if(!look.active) return;
+    for(const t of e.changedTouches){
+      if(t.identifier===look.id){
+        look.dx += t.movementX || 0;
+        look.dy += t.movementY || 0;
+      }
+    }
+  }, {passive:false});
+  const endLook = (e)=>{
+    for(const t of e.changedTouches||[]){
+      if(t.identifier===look.id){ look.active=false; look.id=null; }
+    }
+  };
+  window.addEventListener('touchend', endLook, {passive:false});
+  window.addEventListener('touchcancel', endLook, {passive:false});
+
+  // マウス/PC対応（開発用）
+  let mouseDrag=false;
+  rightArea.addEventListener('mousedown', ()=>{ mouseDrag=true; });
+  window.addEventListener('mouseup', ()=>{ mouseDrag=false; });
+  window.addEventListener('mousemove', (e)=>{ if(mouseDrag){ look.dx += e.movementX; look.dy += e.movementY; } });
+
+  // ========== 射撃 ==========
+  const raycaster = new THREE.Raycaster();
+  let score=0;
+  const scoreEl = document.getElementById('score');
+  function shoot(){
+    // 画面中心からレイ
+    raycaster.setFromCamera({x:0, y:0}, camera);
+    const hits = raycaster.intersectObjects(enemies, false);
+    if(hits.length>0){
+      const target = hits[0].object;
+      target.userData.hp -= 1;
+      // ヒット演出
+      target.material.emissive = new THREE.Color(0x33aaff);
+      setTimeout(()=>{ if(target.material) target.material.emissive = new THREE.Color(0x000000); }, 80);
+      if(target.userData.hp<=0){
+        // 消去＆再湧き
+        scene.remove(target);
+        const idx = enemies.indexOf(target);
+        if(idx>=0) enemies.splice(idx,1);
+        score++;
+        scoreEl.textContent = 'Score: ' + score;
+        spawnEnemy();
+      }
+    }
   }
-}
+  shootBtn.addEventListener('touchstart', (e)=>{ shoot(); e.preventDefault(); }, {passive:false});
+  shootBtn.addEventListener('mousedown', (e)=>{ shoot(); e.preventDefault(); });
 
-/* ====== ユーティリティ ====== */
-function $(q){ return document.querySelector(q); }
-function esc(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-function csv(s){ return `""`; }
-function downloadText(name, text){
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], {type:"text/plain"}));
-  a.download = name; a.click();
-}
-function persist(){ localStorage.setItem('inv_items', JSON.stringify(items)); }
-function yyyymmdd(){ const d = new Date(); const p=n=>String(n).padStart(2,'0'); return `_`; }
-function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+  // ========== ループ & 物理もどき ==========
+  let w=0, h=0;
+  function resize(){
+    const nw = window.innerWidth, nh = window.innerHeight;
+    if(nw===w && nh===h) return;
+    w=nw; h=nh;
+    renderer.setSize(w,h,false);
+    camera.aspect = w/h; camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize, {passive:true});
+  resize();
 
-/* ====== テーマ ====== */
-function applyTheme(mode){ document.body.classList.toggle('light', mode==='light'); localStorage.setItem('inv_theme', mode); }
-function toggleTheme(){ applyTheme(document.body.classList.contains('light')?'dark':'light'); }
+  // 制限タイマー
+  let timeLeft = 60.0; // 秒
+  const timeEl = document.getElementById('time');
+
+  // 視点角
+  let yaw = 0, pitch = 0;
+  const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+
+  // 簡易衝突：壁に出ないようにサイズ境界で制限
+  function confine(pos){
+    const margin = size/2 - 0.8;
+    pos.x = clamp(pos.x, -margin, margin);
+    pos.z = clamp(pos.z, -margin, margin);
+  }
+
+  let last=performance.now();
+  function loop(now){
+    const dt = Math.min(0.05, (now-last)/1000); last=now;
+
+    // 視点更新
+    const sens = 0.18; // 視点感度
+    yaw   -= look.dx * sens * dt;
+    pitch -= look.dy * sens * dt;
+    look.dx = look.dy = 0;
+    pitch = clamp(pitch, -80, 80);
+    const cy = THREE.MathUtils.degToRad(yaw);
+    const cp = THREE.MathUtils.degToRad(pitch);
+    // カメラ方向
+    const dir = new THREE.Vector3(
+      Math.sin(cy)*Math.cos(cp),
+      Math.sin(cp),
+      Math.cos(cy)*Math.cos(cp)
+    ).normalize();
+    camera.lookAt(camera.position.clone().add(dir));
+
+    // 移動（左スティック：x=左右, y=上下→前後使用）
+    const speed = 4.2;
+    const forward = new THREE.Vector3(Math.sin(cy), 0, Math.cos(cy));
+    const right   = new THREE.Vector3(Math.cos(cy), 0, -Math.sin(cy));
+    const move = new THREE.Vector3();
+    move.addScaledVector(forward, -moveStick.y * speed * dt); // 上方向ドラッグで前進
+    move.addScaledVector(right,   moveStick.x * speed * dt);
+    camera.position.add(move);
+    camera.position.y = 1.6; // 常に地面から一定
+    confine(camera.position);
+
+    // 敵の移動＆跳ね返り
+    for(const e of enemies){
+      e.position.x += e.userData.vx * dt;
+      e.position.z += e.userData.vz * dt;
+      const half = size/2 - 1.2;
+      if(e.position.x<-half||e.position.x>half) e.userData.vx *= -1;
+      if(e.position.z<-half||e.position.z>half) e.userData.vz *= -1;
+      e.rotation.x += 0.6*dt; e.rotation.y += 0.8*dt;
+    }
+
+    // タイマー
+    timeLeft -= dt;
+    if(timeLeft <= 0){
+      timeLeft = 0;
+      timeEl.textContent = 'TIME UP';
+      // 入力無効化（超簡易）
+      moveStick.x = moveStick.y = 0;
+      look.dx = look.dy = 0;
+      shootBtn.style.opacity = .5;
+      shootBtn.style.pointerEvents = 'none';
+    } else {
+      timeEl.textContent = timeLeft.toFixed(1)+'s';
+    }
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
