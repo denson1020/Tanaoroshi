@@ -1,0 +1,20 @@
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,'Noto Sans JP',sans-serif}
+body{margin:0;background:#0b0f14;color:#e6edf3}
+#ui{position:fixed;left:0;right:0;top:0;padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,.75),rgba(0,0,0,.0));z-index:2}
+#title{font-weight:700;letter-spacing:.5px}
+#title .tag{font-weight:600;font-size:.9em;opacity:.8;margin-left:.5em}
+#stats{display:flex;gap:12px;flex-wrap:wrap;font-size:.92em;opacity:.95}
+#controls{margin-left:auto;font-size:.9em}
+#controls details{opacity:.9}
+#controls .grid{display:grid;grid-template-columns:auto auto;gap:4px 12px;padding:6px 0}
+#buyMenu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:5}
+#buyMenu.hidden{display:none}
+.buy-header{font-size:1.2em;margin-bottom:8px;font-weight:700}
+.buy-grid{background:#0e141b;border:1px solid #243040;border-radius:10px;padding:16px;display:grid;grid-template-columns:repeat(3, minmax(200px,1fr));gap:10px;min-width:720px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.buy{background:#101821;color:#d9e3ea;border:1px solid #2a3a4d;border-radius:8px;padding:12px;cursor:pointer;transition:.1s}
+.buy:hover{transform:translateY(-1px);border-color:#3d556f}
+.buy-footer{text-align:right;margin-top:10px}
+#closeBuy{padding:8px 12px;border-radius:8px;border:1px solid #2a3a4d;background:#0e141b;color:#d9e3ea;cursor:pointer}
+#game{display:block;margin:0 auto;position:fixed;inset:0;z-index:1}
+.hidden{display:none}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);padding:10px 14px;border-radius:8px;border:1px solid #2a3a4d;z-index:10}

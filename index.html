@@ -1,324 +1,61 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Mini Mobile FPS</title>
-<style>
-  html,body { margin:0; height:100%; background:#000; overflow:hidden; touch-action:none; font-family: system-ui, -apple-system, sans-serif; }
-  #ui { position:fixed; inset:0; pointer-events:none; }
-  #score, #time {
-    position: absolute; top: env(safe-area-inset-top, 8px); 
-    background:rgba(0,0,0,.45); color:#fff; padding:6px 10px; border-radius:8px; font-weight:700; font-size:14px;
-  }
-  #score { left: env(safe-area-inset-left, 8px); }
-  #time { right: env(safe-area-inset-right, 8px); }
-  /* 左：移動スティック */
-  .stickArea { position:absolute; bottom: env(safe-area-inset-bottom, 14px); width:38vw; height:38vw; max-width:260px; max-height:260px; pointer-events:auto; }
-  #leftArea { left: env(safe-area-inset-left, 14px); }
-  #rightArea { right: env(safe-area-inset-right, 14px); }
-  .ring, .dot {
-    position:absolute; border-radius:50%; transform:translate(-50%,-50%);
-    left:50%; top:50%;
-  }
-  .ring { width:70%; height:70%; border:3px solid rgba(255,255,255,.35); }
-  .dot  { width:28%; height:28%; background:rgba(255,255,255,.35); }
-  /* 右：射撃ボタン */
-  #shootBtn {
-    position:absolute; right: env(safe-area-inset-right, 18px); bottom: calc(env(safe-area-inset-bottom, 18px) + 4px);
-    width:64px; height:64px; border-radius:50%; background:rgba(255,50,50,.85); color:#fff; 
-    display:flex; align-items:center; justify-content:center; font-weight:900; pointer-events:auto; user-select:none;
-    box-shadow: 0 6px 18px rgba(255,50,50,.5);
-  }
-  #hint { position:absolute; left:50%; transform:translateX(-50%); bottom: env(safe-area-inset-bottom, 8px); color:#aaa; font-size:12px; }
-  /* 小型端末での縮小 */
-  @media (max-width: 420px) {
-    .stickArea { width:45vw; height:45vw; }
-    #shootBtn { width:58px; height:58px; }
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Canvas Tactical Shooter Demo</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-<canvas id="game"></canvas>
-<div id="ui">
-  <div id="score">Score: 0</div>
-  <div id="time">60.0s</div>
-
-  <div id="leftArea" class="stickArea">
-    <div class="ring"></div><div class="dot" id="leftDot"></div>
+  <div id="ui">
+    <div id="title">Canvas Tactical Shooter Demo <span class="tag">inspired by Valorant</span></div>
+    <div id="stats">
+      <span id="roundInfo">ラウンド: 1 / 12</span>
+      <span id="phaseInfo">フェーズ: 購入</span>
+      <span id="weaponInfo">武器: Classic</span>
+      <span id="ammoInfo">弾薬: 12 / 36</span>
+      <span id="creditsInfo">クレジット: 800</span>
+      <span id="hpInfo">HP: 100</span>
+      <span id="armorInfo">アーマー: 0</span>
+      <span id="spikeInfo">スパイク: 未所持</span>
+    </div>
+    <div id="controls">
+      <details open>
+        <summary>操作説明</summary>
+        <div class="grid">
+          <div>移動:</div><div>WASD</div>
+          <div>歩き:</div><div>Shift</div>
+          <div>射撃:</div><div>左クリック</div>
+          <div>照準拡大:</div><div>右クリック (Rifle/Marshal)</div>
+          <div>リロード:</div><div>R</div>
+          <div>ダッシュ(アビリティ):</div><div>Space（クールダウン）</div>
+          <div>スモーク(アビリティ):</div><div>E（3秒間 視界遮断）</div>
+          <div>購入メニュー:</div><div>B（購入フェーズのみ）</div>
+          <div>スパイク設置/解除:</div><div>G（サイト上）</div>
+          <div>一時停止:</div><div>P</div>
+          <div>クロスヘア設定:</div><div>1/2/3 プリセット切替</div>
+        </div>
+      </details>
+    </div>
+    <div id="buyMenu" class="hidden">
+      <div class="buy-header">購入メニュー</div>
+      <div class="buy-grid">
+        <button class="buy" data-weapon="Classic" data-cost="0">Classic（無料）</button>
+        <button class="buy" data-weapon="Ghost" data-cost="500">Ghost 500</button>
+        <button class="buy" data-weapon="Bulldog" data-cost="2050">Bulldog 2050</button>
+        <button class="buy" data-weapon="Vandal" data-cost="2900">Vandal 2900</button>
+        <button class="buy" data-weapon="Marshal" data-cost="950">Marshal 950</button>
+        <button class="buy" id="buyArmor" data-armor="light" data-cost="400">ライトアーマー 400</button>
+        <button class="buy" id="buyHeavy" data-armor="heavy" data-cost="1000">ヘビーアーマー 1000</button>
+      </div>
+      <div class="buy-footer"><button id="closeBuy">閉じる (B)</button></div>
+    </div>
   </div>
-  <div id="rightArea" class="stickArea">
-    <div class="ring"></div><div class="dot" id="rightDot"></div>
-  </div>
-  <div id="shootBtn">SHOOT</div>
-  <div id="hint">左＝移動 / 右ドラッグ＝視点 / ボタン＝射撃</div>
-</div>
 
-<!-- three.js（CDN） -->
-<script src="https://unpkg.com/three@0.160.1/build/three.min.js"></script>
+  <canvas id="game" width="1280" height="720"></canvas>
 
-<script>
-(() => {
-  // ====== 基本セットアップ ======
-  const canvas = document.getElementById('game');
-  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a12);
+  <div id="toast" class="hidden"></div>
 
-  const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 200);
-  camera.position.set(0, 1.6, 6); // 身長1.6mくらい
-
-  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-  dir.position.set(3,5,2);
-  scene.add(ambient, dir);
-
-  // 地面 & 壁
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(80,80),
-    new THREE.MeshPhongMaterial({color:0x22232a})
-  );
-  floor.rotation.x = -Math.PI/2;
-  scene.add(floor);
-
-  // 簡易アリーナ壁
-  const wallMat = new THREE.MeshPhongMaterial({color:0x1a1c24, shininess:5});
-  const mkWall = (w,h,d,x,z,rotY=0) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
-    m.position.set(x, h/2, z);
-    m.rotation.y = rotY;
-    m.receiveShadow = m.castShadow = true;
-    scene.add(m);
-  };
-  const size = 18;
-  mkWall(size, 3, 0.5, 0, -size/2);
-  mkWall(size, 3, 0.5, 0,  size/2);
-  mkWall(0.5, 3, size, -size/2, 0);
-  mkWall(0.5, 3, size,  size/2, 0);
-
-  // ========== 敵 ==========
-  const enemies = [];
-  const enemyMat = new THREE.MeshPhongMaterial({color:0x3ec7ff});
-  function spawnEnemy(){
-    const s = 0.7 + Math.random()*0.6;
-    const box = new THREE.Mesh(new THREE.BoxGeometry(s,s,s), enemyMat.clone());
-    // アリーナ内ランダム
-    box.position.set((Math.random()-0.5)*(size-3), 1+s/2, (Math.random()-0.5)*(size-3));
-    box.userData.vx = (Math.random()*1.2-0.6);
-    box.userData.vz = (Math.random()*1.2-0.6);
-    box.userData.hp = 1;
-    scene.add(box);
-    enemies.push(box);
-  }
-  for(let i=0;i<8;i++) spawnEnemy();
-
-  // ========== 入力(仮想スティック/視点ドラッグ) ==========
-  const leftArea = document.getElementById('leftArea');
-  const rightArea = document.getElementById('rightArea');
-  const leftDot = document.getElementById('leftDot');
-  const rightDot = document.getElementById('rightDot');
-  const shootBtn = document.getElementById('shootBtn');
-
-  const stick = (area, dot) => {
-    const st = {id:null, x:0, y:0, active:false};
-    const rect = () => area.getBoundingClientRect();
-    const clamp = (v, m) => Math.max(-m, Math.min(m, v));
-    const onStart = (e) => {
-      for(const t of e.changedTouches){
-        if(!st.active){
-          const r = rect();
-          if(t.clientX>=r.left && t.clientX<=r.right && t.clientY>=r.top && t.clientY<=r.bottom){
-            st.id = t.identifier; st.active = true;
-            dot.style.transition = '0s';
-            onMove(e);
-          }
-        }
-      }
-    };
-    const onMove = (e) => {
-      if(!st.active) return;
-      for(const t of e.changedTouches){
-        if(t.identifier===st.id){
-          const r = rect();
-          const cx = r.left + r.width/2;
-          const cy = r.top + r.height/2;
-          const dx = clamp((t.clientX - cx) / (r.width*0.35), 1);
-          const dy = clamp((t.clientY - cy) / (r.height*0.35), 1);
-          st.x = dx; st.y = dy;
-          dot.style.left = (50 + dx*35) + '%';
-          dot.style.top  = (50 + dy*35) + '%';
-        }
-      }
-    };
-    const onEnd = (e) => {
-      for(const t of e.changedTouches){
-        if(t.identifier===st.id){
-          st.id=null; st.active=false; st.x=0; st.y=0;
-          dot.style.transition = '.12s';
-          dot.style.left='50%'; dot.style.top='50%';
-        }
-      }
-    };
-    area.addEventListener('touchstart', onStart, {passive:false});
-    window.addEventListener('touchmove', onMove, {passive:false});
-    window.addEventListener('touchend', onEnd, {passive:false});
-    window.addEventListener('touchcancel', onEnd, {passive:false});
-    return st;
-  };
-
-  const moveStick = stick(leftArea, leftDot);
-
-  // 視点ドラッグ
-  const look = { active:false, id:null, dx:0, dy:0 };
-  rightArea.addEventListener('touchstart', (e)=>{
-    for(const t of e.changedTouches){
-      if(!look.active){
-        const r = rightArea.getBoundingClientRect();
-        if(t.clientX>=r.left && t.clientX<=r.right && t.clientY>=r.top && t.clientY<=r.bottom){
-          look.active=true; look.id=t.identifier; look.dx=0; look.dy=0;
-        }
-      }
-    }
-  }, {passive:false});
-  window.addEventListener('touchmove', (e)=>{
-    if(!look.active) return;
-    for(const t of e.changedTouches){
-      if(t.identifier===look.id){
-        look.dx += t.movementX || 0;
-        look.dy += t.movementY || 0;
-      }
-    }
-  }, {passive:false});
-  const endLook = (e)=>{
-    for(const t of e.changedTouches||[]){
-      if(t.identifier===look.id){ look.active=false; look.id=null; }
-    }
-  };
-  window.addEventListener('touchend', endLook, {passive:false});
-  window.addEventListener('touchcancel', endLook, {passive:false});
-
-  // マウス/PC対応（開発用）
-  let mouseDrag=false;
-  rightArea.addEventListener('mousedown', ()=>{ mouseDrag=true; });
-  window.addEventListener('mouseup', ()=>{ mouseDrag=false; });
-  window.addEventListener('mousemove', (e)=>{ if(mouseDrag){ look.dx += e.movementX; look.dy += e.movementY; } });
-
-  // ========== 射撃 ==========
-  const raycaster = new THREE.Raycaster();
-  let score=0;
-  const scoreEl = document.getElementById('score');
-  function shoot(){
-    // 画面中心からレイ
-    raycaster.setFromCamera({x:0, y:0}, camera);
-    const hits = raycaster.intersectObjects(enemies, false);
-    if(hits.length>0){
-      const target = hits[0].object;
-      target.userData.hp -= 1;
-      // ヒット演出
-      target.material.emissive = new THREE.Color(0x33aaff);
-      setTimeout(()=>{ if(target.material) target.material.emissive = new THREE.Color(0x000000); }, 80);
-      if(target.userData.hp<=0){
-        // 消去＆再湧き
-        scene.remove(target);
-        const idx = enemies.indexOf(target);
-        if(idx>=0) enemies.splice(idx,1);
-        score++;
-        scoreEl.textContent = 'Score: ' + score;
-        spawnEnemy();
-      }
-    }
-  }
-  shootBtn.addEventListener('touchstart', (e)=>{ shoot(); e.preventDefault(); }, {passive:false});
-  shootBtn.addEventListener('mousedown', (e)=>{ shoot(); e.preventDefault(); });
-
-  // ========== ループ & 物理もどき ==========
-  let w=0, h=0;
-  function resize(){
-    const nw = window.innerWidth, nh = window.innerHeight;
-    if(nw===w && nh===h) return;
-    w=nw; h=nh;
-    renderer.setSize(w,h,false);
-    camera.aspect = w/h; camera.updateProjectionMatrix();
-  }
-  window.addEventListener('resize', resize, {passive:true});
-  resize();
-
-  // 制限タイマー
-  let timeLeft = 60.0; // 秒
-  const timeEl = document.getElementById('time');
-
-  // 視点角
-  let yaw = 0, pitch = 0;
-  const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
-
-  // 簡易衝突：壁に出ないようにサイズ境界で制限
-  function confine(pos){
-    const margin = size/2 - 0.8;
-    pos.x = clamp(pos.x, -margin, margin);
-    pos.z = clamp(pos.z, -margin, margin);
-  }
-
-  let last=performance.now();
-  function loop(now){
-    const dt = Math.min(0.05, (now-last)/1000); last=now;
-
-    // 視点更新
-    const sens = 0.18; // 視点感度
-    yaw   -= look.dx * sens * dt;
-    pitch -= look.dy * sens * dt;
-    look.dx = look.dy = 0;
-    pitch = clamp(pitch, -80, 80);
-    const cy = THREE.MathUtils.degToRad(yaw);
-    const cp = THREE.MathUtils.degToRad(pitch);
-    // カメラ方向
-    const dir = new THREE.Vector3(
-      Math.sin(cy)*Math.cos(cp),
-      Math.sin(cp),
-      Math.cos(cy)*Math.cos(cp)
-    ).normalize();
-    camera.lookAt(camera.position.clone().add(dir));
-
-    // 移動（左スティック：x=左右, y=上下→前後使用）
-    const speed = 4.2;
-    const forward = new THREE.Vector3(Math.sin(cy), 0, Math.cos(cy));
-    const right   = new THREE.Vector3(Math.cos(cy), 0, -Math.sin(cy));
-    const move = new THREE.Vector3();
-    move.addScaledVector(forward, -moveStick.y * speed * dt); // 上方向ドラッグで前進
-    move.addScaledVector(right,   moveStick.x * speed * dt);
-    camera.position.add(move);
-    camera.position.y = 1.6; // 常に地面から一定
-    confine(camera.position);
-
-    // 敵の移動＆跳ね返り
-    for(const e of enemies){
-      e.position.x += e.userData.vx * dt;
-      e.position.z += e.userData.vz * dt;
-      const half = size/2 - 1.2;
-      if(e.position.x<-half||e.position.x>half) e.userData.vx *= -1;
-      if(e.position.z<-half||e.position.z>half) e.userData.vz *= -1;
-      e.rotation.x += 0.6*dt; e.rotation.y += 0.8*dt;
-    }
-
-    // タイマー
-    timeLeft -= dt;
-    if(timeLeft <= 0){
-      timeLeft = 0;
-      timeEl.textContent = 'TIME UP';
-      // 入力無効化（超簡易）
-      moveStick.x = moveStick.y = 0;
-      look.dx = look.dy = 0;
-      shootBtn.style.opacity = .5;
-      shootBtn.style.pointerEvents = 'none';
-    } else {
-      timeEl.textContent = timeLeft.toFixed(1)+'s';
-    }
-
-    renderer.render(scene, camera);
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-})();
-</script>
+  <script src="main.js"></script>
 </body>
 </html>
